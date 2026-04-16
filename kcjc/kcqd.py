@@ -4,7 +4,7 @@ author: zhilv
 网站地址: https://xn--66tw07h.com/
 我的邀请链接: https://快车.com?c=VVNLMV
 功能: 签到
-环境变量: KC_COOKIES=[{"cookie": "cookie1", "name": "name1"}, {"cookie": "cookie2", "name": "name2"}]
+环境变量: KC_COOKIES=[{"email":"xx@xx.xx","password":"xxx","name":"name1"},{"email":"xx@xx.xx","password":"xxx","name":"name2"}]
 """
 
 from notify import send
@@ -12,6 +12,9 @@ import requests
 import json
 import base64
 import os
+import hashlib
+
+session = requests.session()
 
 
 class L:
@@ -37,8 +40,14 @@ def b64Decode(text: str) -> str:
     return base64.b64decode(text.encode()).decode()
 
 
-def sign(cookie: str, l: L):
-    response = requests.post(
+def md5(text: str) -> str:
+    _md5 = hashlib.md5()
+    _md5.update(text.encode())
+    return _md5.hexdigest().lower()
+
+
+def sign(l: L):
+    response = session.post(
         "https://wj-kc.com/api/user/sign_use",
         json={"data": b64Encode("{}")},
         headers={
@@ -57,7 +66,6 @@ def sign(cookie: str, l: L):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-            "Cookie": f"{cookie}",
         },
     )
 
@@ -65,13 +73,46 @@ def sign(cookie: str, l: L):
         data = json.loads(b64Decode(response.json().get("data", None)))
         if data and data.get("code", -1) == 0:
             l.info(f"签到成功: [{data}]")
-            l.info("快车代理签到", f"签到成功: [{data}]")
         elif data:
             l.info(f"签到失败: [{data}]")
-            l.info("快车代理签到", f"签到失败: [{data}]")
         else:
             l.info(f"签到失败: [{response.json()}]")
-            l.info("快车代理签到", f"签到失败: [{response.json()}]")
+    except Exception as e:
+        l.info(f"读取结果出错: {e}")
+
+
+def login(email: str, password: str, l: L):
+    response = session.post(
+        "https://wj-kc.com/api/user/login",
+        json={
+            "data": b64Encode(json.dumps({"email": email, "password": md5(password)}))
+        },
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "accept-language": "zh-CN,zh;q=0.9,en-CN;q=0.8,en;q=0.7",
+            "cache-control": "no-cache",
+            "origin": "https://wj-kc.com",
+            "pragma": "no-cache",
+            "priority": "u=1, i",
+            "referer": "https://wj-kc.com/",
+            "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+        },
+    )
+    try:
+        data = json.loads(b64Decode(response.json().get("data", None)))
+        if data and data.get("code", -1) == 0:
+            l.info(f"登录成功: [{data}]")
+        elif data:
+            l.info(f"登录失败: [{data}]")
+        else:
+            l.info(f"登录失败: [{response.json()}]")
     except Exception as e:
         l.info(f"读取结果出错: {e}")
 
@@ -88,7 +129,8 @@ def main():
     items: list[dict] = json.loads(raw)
     for item in items:
         l = L(item.get("name", ""))
-        sign(item.get("cookie", ""), l)
+        login(item.get("email", ""), item.get("password", ""), l)
+        sign(l)
         LOGS.append(l.log)
     send("快车机场", "\n".join(LOGS))
 
