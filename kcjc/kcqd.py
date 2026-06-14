@@ -16,7 +16,7 @@ import hashlib
 
 session = requests.session()
 
-HOST = "https://kc.wjkc.my"
+HOST = ""
 
 
 class L:
@@ -48,6 +48,42 @@ def md5(text: str) -> str:
     return _md5.hexdigest().lower()
 
 
+def get_host():
+    try:
+        response = requests.post(
+            "https://xn--66tw07h.com/api/host/get",
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+                "Accept": "*/*",
+                "Accept-Language": "zh-CN,zh;q=0.9,en-CN;q=0.8,en;q=0.7",
+                "Origin": "https://xn--66tw07h.com",
+                "Referer": "https://xn--66tw07h.com/",
+            },
+            timeout=15,
+        )
+
+        response.raise_for_status()
+
+        data = response.json().get("data")
+        if not data:
+            raise Exception("获取Host失败")
+
+        result = json.loads(base64.b64decode(data).decode())
+
+        if result.get("code") != 0:
+            raise Exception(f"获取Host失败: {result}")
+
+        host = result["data"]["contentUrl_guowai"]
+
+        if host.endswith("/"):
+            host = host[:-1]
+
+        return host
+    except Exception as e:
+        print(f"获取Host失败: {e}")
+        return "https://kl.wj-kc.com"
+
+
 def sign(l: L):
     response = session.post(
         f"{HOST}/api/user/sign_use",
@@ -74,7 +110,9 @@ def sign(l: L):
     try:
         data = json.loads(b64Decode(response.json().get("data", None)))
         if data and data.get("code", -1) == 0:
-            l.info(f"签到成功: [{data}]")
+            l.info(
+                f"签到成功: 流量: {data.get('data', {}).get('addTraffic', 0)/1024/1024}MB, 天数: {data.get('data', {}).get('haveContinueSignUseData', 0)}"
+            )
         elif data:
             l.info(f"签到失败: [{data}]")
         else:
@@ -127,6 +165,12 @@ def main():
     if not raw:
         print(f"⛔️未获取到ck变量：请检查变量 {env_name} 是否填写")
         exit(0)
+
+    global HOST
+
+    HOST = get_host()
+
+    print(f"当前Host: {HOST}")
 
     items: list[dict] = json.loads(raw)
     for item in items:
