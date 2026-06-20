@@ -2,13 +2,14 @@
 author: zhilv
 邮箱: zhilv666@qq.com
 功能: New API 通用签到 (开了 Tunsite 签不了)
-环境变量: NEW_API_XV_TOKENS=[{"session": "xxx", "website": "http://xxx.com", "user": "1234", "name": "name1"}, {"session": "session2", "website": "website2", "user": "1235", , "name": "name2"}]
+环境变量: NEW_API_XV_TOKENS=[{"cookies": "xxx=xxx;xxx=xxx", "website": "http://xxx.com", "user": "1234", "name": "name1"}, {"cookies": "xxx=xxx;xxx=xxx", "website": "website2", "user": "1235", , "name": "name2"}]
 """
 
 from notify import wecom_bot
 import requests
 import json
 import os
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,7 +30,7 @@ class L:
         return "\n".join(self.logs)
 
 
-def checkin(session: str, user: str, website: str, l: L):
+def checkin(cookies: str, user: str, website: str, l: L):
     response = requests.post(
         f"{website}/api/user/checkin",
         headers={
@@ -38,7 +39,7 @@ def checkin(session: str, user: str, website: str, l: L):
             "origin": website,
             "new-api-user": user,
             "referer": f"{website}/console/personal",
-            "Cookie": f"session={session}",
+            "Cookie": cookies,
         },
     )
     try:
@@ -55,15 +56,15 @@ def checkin(session: str, user: str, website: str, l: L):
         usd = quota / 500000
 
         if success:
-            l.info(f"签到成功 | 获得额度: {quota} quota | " f"约 ${usd:.4f}")
+            l.info(f"签到成功 ✅️ | " f"约 ${usd:.4f}")
         else:
-            l.info(f"签到失败: {message}")
+            l.info(f"签到失败 ❌️ : {message}")
 
     except ValueError:
-        l.info(f"JSON解析失败: {response.text}")
+        l.info(f"JSON解析失败 ❌️ : {response.text}")
 
     except Exception as e:
-        l.info(f"签到异常: {e}")
+        l.info(f"签到异常 ❌️ : {e}")
 
 
 def main():
@@ -72,16 +73,17 @@ def main():
 
     raw = os.getenv(env_name)
     if not raw:
-        print(f"⛔️未获取到ck变量：请检查变量 {env_name} 是否填写")
+        print(f"⛔️ 未获取到ck变量：请检查变量 {env_name} 是否填写")
         exit(0)
 
     items: list[dict] = json.loads(raw)
     for item in items:
         l = L(item.get("name", ""))
         checkin(
-            item.get("session", ""), item.get("user", ""), item.get("website", ""), l
+            item.get("cookies", ""), item.get("user", ""), item.get("website", ""), l
         )
         LOGS.append(l.log)
+        time.sleep(1)
     wecom_bot("NewAPI 签到", "\n".join(LOGS))
 
 
