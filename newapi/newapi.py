@@ -9,11 +9,13 @@ email: zhilv666@qq.com
   [
     {
       "token": "xxx",
+      "cookies": "session=xxx; cf_clearance=xxx",
       "website": "https://example.com",
       "user": "1234",
       "name": "example"
     }
   ]
+  token 优先；没有 token 时使用 cookies。
 
 可选环境变量:
   NEW_API_PROXY=http://127.0.0.1:9000
@@ -60,6 +62,7 @@ QUOTA_PER_USD = 500000
 @dataclass
 class Account:
     token: str
+    cookies: str
     website: str
     user: str
     name: str = "unknown"
@@ -146,13 +149,14 @@ def get_token_env() -> tuple[str | None, str | None]:
 
 def normalize_account(item: dict[str, Any], index: int) -> Account:
     token = str(item.get("token") or "").strip()
+    cookies = str(item.get("cookies") or item.get("cookie") or "").strip()
     website = str(item.get("website") or item.get("url") or "").strip()
     user = str(item.get("user") or item.get("user_id") or "").strip()
     name = str(item.get("name") or item.get("remark") or f"account-{index}").strip()
 
     missing = []
-    if not token:
-        missing.append("token")
+    if not token and not cookies:
+        missing.append("token 或 cookies")
     if not website:
         missing.append("website")
     if not user:
@@ -164,7 +168,7 @@ def normalize_account(item: dict[str, Any], index: int) -> Account:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError(f"第 {index} 个账号 website 不合法: {website}")
 
-    return Account(token=token, website=website, user=user, name=name)
+    return Account(token=token, cookies=cookies, website=website, user=user, name=name)
 
 
 def load_accounts() -> list[Account]:
@@ -226,12 +230,16 @@ def build_proxies() -> dict[str, str] | None:
 
 
 def build_account_headers(account: Account) -> dict[str, str]:
-    return {
+    headers = {
         "Origin": account.base_url,
         "Referer": f"{account.base_url}/console/personal",
         "New-API-User": account.user,
-        "Authorization": f"Bearer {account.token}",
     }
+    if account.token:
+        headers["Authorization"] = f"Bearer {account.token}"
+    else:
+        headers["Cookie"] = account.cookies
+    return headers
 
 
 def parse_response(response: Response, account: Account) -> CheckinResult:
